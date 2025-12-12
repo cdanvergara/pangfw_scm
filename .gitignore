@@ -1,0 +1,232 @@
+# =============================================================================
+# .gitignore for Terraform Palo Alto NGFW Project
+# =============================================================================
+
+# =============================================================================
+# Terraform Files
+# =============================================================================
+
+# Terraform state files
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+
+# Terraform plan files
+*.tfplan
+
+# Terraform variable files with sensitive data
+terraform.tfvars
+*.auto.tfvars
+
+# Terraform lock files (comment out if you want to commit lock files)
+.terraform.lock.hcl
+
+# Terraform directories
+.terraform/
+.terraform.d/
+
+# =============================================================================
+# IDE and Editor Files
+# =============================================================================
+
+# Visual Studio Code
+.vscode/
+*.code-workspace
+
+# JetBrains IDEs
+.idea/
+*.iml
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# Sublime Text
+*.sublime-workspace
+*.sublime-project
+
+# =============================================================================
+# Operating System Files
+# =============================================================================
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msm
+*.msp
+*.lnk
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# =============================================================================
+# Security and Sensitive Files
+# =============================================================================
+
+# Credential files
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+*.p7b
+*.p7c
+
+# SSH keys
+id_rsa
+id_rsa.pub
+id_ed25519
+id_ed25519.pub
+
+# Environment files
+.env
+.env.local
+.env.production
+.env.test
+
+# Azure CLI
+.azure/
+
+# AWS CLI
+.aws/
+
+# =============================================================================
+# Logs and Temporary Files
+# =============================================================================
+
+# Log files
+*.log
+logs/
+*.out
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# =============================================================================
+# Build and Output Directories
+# =============================================================================
+
+# Build outputs
+build/
+dist/
+output/
+bin/
+
+# =============================================================================
+# Project Specific Files
+# =============================================================================
+
+# Palo Alto specific files
+panorama_config/
+ngfw_backups/
+*.cfg
+
+# Azure specific files
+azure_credentials.json
+service_principal.json
+
+# Generated documentation
+docs/generated/
+
+# Test results
+test_results/
+*.xml
+
+# Coverage reports
+coverage/
+*.coverage
+
+# =============================================================================
+# Custom Configuration Files (Add your own)
+# =============================================================================
+
+# Local configuration overrides
+local.tf
+local.tfvars
+override.tf
+
+# Personal notes
+NOTES.md
+TODO.md
+personal/
+
+# Backup files
+*.orig
+*.save
+
+# =============================================================================
+# Package Managers
+# =============================================================================
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+
+# =============================================================================
+# Archive Files
+# =============================================================================
+
+*.zip
+*.tar.gz
+*.tgz
+*.rar
+*.7z
