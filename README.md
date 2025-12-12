@@ -896,12 +896,325 @@ Access outputs after deployment:
 terraform output
 ```
 
-## 🧹 Cleanup
+## 🧹 Complete Cleanup Process
 
-Remove all resources:
-```bash
-terraform destroy
+### Option 1: Terraform Destroy (Recommended)
+
+#### Step-by-Step Destruction
+1. **Backup Important Data**:
+   ```bash
+   # Export current configuration
+   terraform output > terraform-outputs.backup
+   
+   # Backup state file
+   cp terraform.tfstate terraform.tfstate.backup
+   
+   # Backup configuration
+   cp terraform.tfvars terraform.tfvars.backup
+   ```
+
+2. **Plan Destruction**:
+   ```bash
+   terraform plan -destroy -var-file="terraform.tfvars"
+   ```
+   Review the destruction plan carefully to ensure only expected resources will be deleted.
+
+3. **Execute Destruction**:
+   ```bash
+   terraform destroy -var-file="terraform.tfvars"
+   ```
+
+4. **Verify Complete Removal**:
+   ```bash
+   # Check if resource groups are gone
+   az group list --output table | grep "pangfw"
+   
+   # Verify no orphaned resources
+   az resource list --output table | grep "pangfw"
+   ```
+
+#### Automated Cleanup Script
+Use the provided PowerShell script:
+```powershell
+# Windows
+.\deploy.ps1 destroy -Force
+
+# Or with confirmation
+.\deploy.ps1 destroy
 ```
+
+Use the provided Bash script:
+```bash
+# Linux/macOS
+./deploy.sh destroy
+```
+
+### Option 2: Manual Azure CLI Cleanup
+
+#### If Terraform Destroy Fails
+```bash
+# Get resource group names from Terraform state
+PRIMARY_RG=$(terraform output -raw primary_resource_group_name)
+SECONDARY_RG=$(terraform output -raw secondary_resource_group_name)
+
+# Delete resource groups (this will delete all contained resources)
+az group delete --name "$PRIMARY_RG" --yes --no-wait
+az group delete --name "$SECONDARY_RG" --yes --no-wait
+
+# Monitor deletion progress
+az group list --output table | grep "pangfw"
+```
+
+#### Complete Manual Cleanup
+```bash
+# List all resources with pangfw in the name
+az resource list --query "[?contains(name,'pangfw')]" --output table
+
+# Delete specific resources if needed
+az network public-ip delete --name "pangfw-prod-pip-ngfw-eus" --resource-group "pangfw-prod-rg-eus"
+az network public-ip delete --name "pangfw-prod-pip-ngfw-cus" --resource-group "pangfw-prod-rg-cus"
+
+# Delete firewalls
+az palo-alto next-generation-firewall delete --name "pangfw-prod-ngfw-eus" --resource-group "pangfw-prod-rg-eus"
+az palo-alto next-generation-firewall delete --name "pangfw-prod-ngfw-cus" --resource-group "pangfw-prod-rg-cus"
+```
+
+### Post-Cleanup Verification
+
+#### Verify All Resources Removed
+```bash
+# Check for any remaining pangfw resources
+az resource list --query "[?contains(name,'pangfw')]" --output table
+
+# Verify resource groups are gone
+az group exists --name "pangfw-prod-rg-eus"
+az group exists --name "pangfw-prod-rg-cus"
+
+# Check for orphaned public IPs
+az network public-ip list --query "[?contains(name,'pangfw')]" --output table
+```
+
+#### Clean Up Local Files
+```bash
+# Remove Terraform state and plan files
+rm -f terraform.tfstate*
+rm -f *.tfplan
+rm -f terraform-debug.log
+
+# Optional: Remove downloaded providers
+rm -rf .terraform/
+```
+
+## 🔄 Migration and Updates
+
+### Updating to New Template Version
+
+#### Backup Current Deployment
+```bash
+# Export current state
+terraform state pull > current-state.backup
+
+# Export outputs
+terraform output > current-outputs.backup
+
+# Backup configuration
+cp terraform.tfvars terraform.tfvars.backup
+```
+
+#### Update Process
+```bash
+# Pull latest template version
+git pull origin main
+
+# Check for breaking changes
+git log --oneline --since="1 month ago"
+
+# Reinitialize with new providers
+terraform init -upgrade
+
+# Plan the update
+terraform plan -var-file="terraform.tfvars"
+
+# Apply updates
+terraform apply -var-file="terraform.tfvars"
+```
+
+### Scaling Operations
+
+#### Scale Up NGFWs
+```hcl
+# In terraform.tfvars, increase scale units
+nva_scale_unit = 2          # Was 1
+throughput_capacity = 2     # Match scale units
+session_capacity = 200      # Increase capacity
+```
+
+```bash
+# Apply the scaling change
+terraform plan -var-file="terraform.tfvars"
+terraform apply -var-file="terraform.tfvars"
+```
+
+#### Add Additional Regions
+```hcl
+# This template supports 2 regions, but you can deploy multiple instances
+# Create a new instance in different regions by:
+# 1. Copy the entire template to a new directory
+# 2. Change project_name to avoid conflicts
+# 3. Configure new regions
+```
+
+## 📞 Advanced Support and Integration
+
+### Integration with Azure Monitor
+
+#### Custom Monitoring Dashboard
+```bash
+# Create custom dashboard for NGFW monitoring
+az portal dashboard create \
+  --name "NGFW-Monitoring-Dashboard" \
+  --resource-group "pangfw-prod-rg-eus" \
+  --input-path "ngfw-dashboard.json"
+```
+
+#### Log Analytics Queries
+```kql
+// Query for NGFW traffic logs
+AzureActivity
+| where ResourceGroup contains "pangfw"
+| where ActivityStatus == "Success"
+| summarize count() by ResourceGroup, bin(TimeGenerated, 1h)
+
+// Query for security events
+SecurityEvent
+| where Computer contains "ngfw"
+| where EventID in (4624, 4625)  // Logon events
+| summarize count() by EventID, bin(TimeGenerated, 1h)
+```
+
+### Integration with Azure Security Center
+
+#### Enable Security Center Integration
+```bash
+# Enable Security Center for the subscription
+az security auto-provisioning-setting update \
+  --name "default" \
+  --auto-provision "On"
+
+# Configure security contacts
+az security contact create \
+  --email "security@company.com" \
+  --phone "555-1234" \
+  --alert-notifications "On" \
+  --alerts-to-admins "On"
+```
+
+### Backup and Disaster Recovery
+
+#### Automated Backup Strategy
+```bash
+# Create backup script for NGFW configurations
+cat << 'EOF' > backup-ngfw-config.sh
+#!/bin/bash
+DATE=$(date +%Y%m%d_%H%M%S)
+BACKUP_DIR="./backups/$DATE"
+mkdir -p "$BACKUP_DIR"
+
+# Backup Terraform state
+terraform state pull > "$BACKUP_DIR/terraform.tfstate"
+
+# Backup configuration
+cp terraform.tfvars "$BACKUP_DIR/"
+cp *.tf "$BACKUP_DIR/"
+
+# Backup NGFW configs (if accessible)
+PRIMARY_IP=$(terraform output -raw primary_ngfw_public_ip)
+SECONDARY_IP=$(terraform output -raw secondary_ngfw_public_ip)
+
+echo "Backup completed in $BACKUP_DIR"
+EOF
+
+chmod +x backup-ngfw-config.sh
+```
+
+### Performance Optimization
+
+#### Network Performance Tuning
+```hcl
+# In terraform.tfvars for high-performance scenarios
+nva_scale_unit = 5              # Higher throughput
+throughput_capacity = 5         # Match scale units
+session_capacity = 1000         # High session count
+
+# Use performance-optimized regions
+primary_region = "East US"      # Microsoft's largest datacenter
+secondary_region = "West US 2"  # High-performance region
+
+# Enable all availability zones
+availability_zones = ["1", "2", "3"]
+```
+
+### Compliance and Auditing
+
+#### Compliance Configuration
+```hcl
+# In terraform.tfvars for compliance environments
+log_retention_days = 2555       # 7 years retention
+enable_monitoring = true
+log_analytics_sku = "PerGB2018"
+
+# Compliance tags
+tags = {
+  Compliance    = "SOX-HIPAA-PCI"
+  DataClass     = "Restricted"
+  Environment   = "Production"
+  BackupPolicy  = "Required"
+  Monitoring    = "Required"
+}
+```
+
+#### Audit Trail Setup
+```bash
+# Enable activity logging for the subscription
+az monitor activity-log alert create \
+  --name "NGFW-Configuration-Changes" \
+  --resource-group "pangfw-prod-rg-eus" \
+  --condition category=Administrative \
+  --action-group "/subscriptions/.../actionGroups/security-alerts"
+```
+
+## 🎯 Best Practices Summary
+
+### Security Best Practices
+1. **Never use 0.0.0.0/0** in `management_allowed_ips`
+2. **Enable DDoS protection** for production
+3. **Use strong, unique project names** to avoid conflicts
+4. **Implement least-privilege access** for management
+5. **Enable comprehensive logging** for audit trails
+6. **Regular backup** of configurations and state
+7. **Monitor costs** and set up budget alerts
+
+### Operational Best Practices
+1. **Use version control** for all Terraform files
+2. **Implement CI/CD pipelines** for deployments
+3. **Test in development** before production
+4. **Document all customizations**
+5. **Regular updates** of providers and templates
+6. **Monitor performance** and scale as needed
+7. **Plan for disaster recovery**
+
+### Cost Management Best Practices
+1. **Start with minimal scale units** and increase as needed
+2. **Use auto-shutdown** for development environments
+3. **Monitor costs** with Azure Cost Management
+4. **Regular review** of resource utilization
+5. **Consider reserved instances** for long-term deployments
+6. **Optimize regions** based on cost and performance
+7. **Clean up unused resources** promptly
+
+---
+
+**🎉 Congratulations!** You now have a complete guide for deploying and managing Palo Alto Next Generation Firewall on Azure across multiple regions. This template provides enterprise-grade security with the flexibility to customize for your specific requirements.
 
 ## 🐛 Detailed Troubleshooting Guide
 
