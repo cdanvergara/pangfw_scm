@@ -98,11 +98,11 @@ variable "existing_vhub_secondary_name" {
 # =============================================================================
 
 variable "strata_cloud_manager_tenant_name" {
-  description = "Strata Cloud Manager tenant name that will manage the policy for these firewalls"
+  description = "Strata Cloud Manager tenant ID (not display name) that will manage the policy for these firewalls. Find this in the SCM portal URL or account settings."
   type        = string
   validation {
     condition     = length(var.strata_cloud_manager_tenant_name) > 0
-    error_message = "Strata Cloud Manager tenant name cannot be empty."
+    error_message = "Strata Cloud Manager tenant ID cannot be empty."
   }
 }
 
