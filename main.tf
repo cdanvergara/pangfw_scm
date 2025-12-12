@@ -119,132 +119,144 @@ resource "azurerm_public_ip" "secondary_ngfw" {
 }
 
 # =============================================================================
-# Palo Alto Local Rulestacks
+# Palo Alto Virtual Network Appliances
 # =============================================================================
 
-# Primary region local rulestack
-resource "azurerm_palo_alto_local_rulestack" "primary" {
-  name                = "${local.resource_prefix}-lrs-${local.regions.primary.short_name}"
-  resource_group_name = azurerm_resource_group.primary.name
-  location           = azurerm_resource_group.primary.location
+# Primary region Virtual Network Appliance
+resource "azurerm_palo_alto_virtual_network_appliance" "primary" {
+  name           = "${local.resource_prefix}-appliance-${local.regions.primary.short_name}"
+  virtual_hub_id = data.azurerm_virtual_hub.primary_hub.id
   
-  anti_spyware_profile   = var.anti_spyware_profile
-  anti_virus_profile     = var.anti_virus_profile
-  dns_subscription       = var.dns_subscription
-  file_blocking_profile  = var.file_blocking_profile
-  url_filtering_profile  = var.url_filtering_profile
-  vulnerability_profile  = var.vulnerability_profile
-
   tags = local.common_tags
 }
 
-# Secondary region local rulestack
-resource "azurerm_palo_alto_local_rulestack" "secondary" {
-  name                = "${local.resource_prefix}-lrs-${local.regions.secondary.short_name}"
-  resource_group_name = azurerm_resource_group.secondary.name
-  location           = azurerm_resource_group.secondary.location
+# Secondary region Virtual Network Appliance
+resource "azurerm_palo_alto_virtual_network_appliance" "secondary" {
+  name           = "${local.resource_prefix}-appliance-${local.regions.secondary.short_name}"
+  virtual_hub_id = data.azurerm_virtual_hub.secondary_hub.id
   
-  anti_spyware_profile   = var.anti_spyware_profile
-  anti_virus_profile     = var.anti_virus_profile
-  dns_subscription       = var.dns_subscription
-  file_blocking_profile  = var.file_blocking_profile
-  url_filtering_profile  = var.url_filtering_profile
-  vulnerability_profile  = var.vulnerability_profile
-
   tags = local.common_tags
 }
 
 # =============================================================================
-# Palo Alto Next Generation Firewalls
+# Palo Alto Next Generation Firewalls with Strata Cloud Manager
 # =============================================================================
 
-# Primary region NGFW
-resource "azurerm_palo_alto_next_generation_firewall_virtual_hub_panorama" "primary" {
-  name                = "${local.resource_prefix}-ngfw-${local.regions.primary.short_name}"
-  resource_group_name = azurerm_resource_group.primary.name
-  location           = azurerm_resource_group.primary.location
-
-  panorama_configuration {
-    config_string    = var.panorama_config_string
-    host_name       = var.panorama_hostname
-    panorama_server = var.panorama_server
-    panorama_server_2 = var.panorama_server_2
-    template_name   = var.panorama_template_name
-    virtual_machine_ssh_key = var.panorama_vm_ssh_key
-  }
+# Primary region NGFW with Strata Cloud Manager
+resource "azurerm_palo_alto_next_generation_firewall_virtual_hub_strata_cloud_manager" "primary" {
+  name                             = "${local.resource_prefix}-ngfw-${local.regions.primary.short_name}"
+  resource_group_name              = azurerm_resource_group.primary.name
+  location                        = azurerm_resource_group.primary.location
+  strata_cloud_manager_tenant_name = var.strata_cloud_manager_tenant_name
 
   network_profile {
-    public_ip_address_ids          = [azurerm_public_ip.primary_ngfw.id]
-    virtual_hub_id                = data.azurerm_virtual_hub.primary_hub.id
-    network_virtual_appliance_id  = azurerm_network_virtual_appliance.primary.id
+    public_ip_address_ids        = [azurerm_public_ip.primary_ngfw.id]
+    virtual_hub_id              = data.azurerm_virtual_hub.primary_hub.id
+    network_virtual_appliance_id = azurerm_palo_alto_virtual_network_appliance.primary.id
+    
+    dynamic "trusted_address_ranges" {
+      for_each = var.trusted_address_ranges
+      content {
+        trusted_address_ranges = trusted_address_ranges.value
+      }
+    }
+  }
+
+  dynamic "dns_settings" {
+    for_each = var.enable_custom_dns ? [1] : []
+    content {
+      dns_servers    = var.custom_dns_servers
+      use_azure_dns  = length(var.custom_dns_servers) == 0
+    }
+  }
+
+  dynamic "destination_nat" {
+    for_each = var.destination_nat_rules
+    content {
+      name     = destination_nat.value.name
+      protocol = destination_nat.value.protocol
+      
+      dynamic "backend_config" {
+        for_each = destination_nat.value.backend_configs
+        content {
+          port               = backend_config.value.port
+          public_ip_address  = backend_config.value.public_ip_address
+        }
+      }
+      
+      dynamic "frontend_config" {
+        for_each = destination_nat.value.frontend_configs
+        content {
+          port                  = frontend_config.value.port
+          public_ip_address_id  = frontend_config.value.public_ip_address_id
+        }
+      }
+    }
   }
 
   tags = local.common_tags
 
-  depends_on = [azurerm_palo_alto_local_rulestack.primary]
+  depends_on = [azurerm_palo_alto_virtual_network_appliance.primary]
 }
 
-# Secondary region NGFW
-resource "azurerm_palo_alto_next_generation_firewall_virtual_hub_panorama" "secondary" {
-  name                = "${local.resource_prefix}-ngfw-${local.regions.secondary.short_name}"
-  resource_group_name = azurerm_resource_group.secondary.name
-  location           = azurerm_resource_group.secondary.location
-
-  panorama_configuration {
-    config_string    = var.panorama_config_string
-    host_name       = var.panorama_hostname
-    panorama_server = var.panorama_server
-    panorama_server_2 = var.panorama_server_2
-    template_name   = var.panorama_template_name
-    virtual_machine_ssh_key = var.panorama_vm_ssh_key
-  }
+# Secondary region NGFW with Strata Cloud Manager
+resource "azurerm_palo_alto_next_generation_firewall_virtual_hub_strata_cloud_manager" "secondary" {
+  name                             = "${local.resource_prefix}-ngfw-${local.regions.secondary.short_name}"
+  resource_group_name              = azurerm_resource_group.secondary.name
+  location                        = azurerm_resource_group.secondary.location
+  strata_cloud_manager_tenant_name = var.strata_cloud_manager_tenant_name
 
   network_profile {
-    public_ip_address_ids          = [azurerm_public_ip.secondary_ngfw.id]
-    virtual_hub_id                = data.azurerm_virtual_hub.secondary_hub.id
-    network_virtual_appliance_id  = azurerm_network_virtual_appliance.secondary.id
+    public_ip_address_ids        = [azurerm_public_ip.secondary_ngfw.id]
+    virtual_hub_id              = data.azurerm_virtual_hub.secondary_hub.id
+    network_virtual_appliance_id = azurerm_palo_alto_virtual_network_appliance.secondary.id
+    
+    dynamic "trusted_address_ranges" {
+      for_each = var.trusted_address_ranges
+      content {
+        trusted_address_ranges = trusted_address_ranges.value
+      }
+    }
+  }
+
+  dynamic "dns_settings" {
+    for_each = var.enable_custom_dns ? [1] : []
+    content {
+      dns_servers    = var.custom_dns_servers
+      use_azure_dns  = length(var.custom_dns_servers) == 0
+    }
+  }
+
+  dynamic "destination_nat" {
+    for_each = var.destination_nat_rules
+    content {
+      name     = destination_nat.value.name
+      protocol = destination_nat.value.protocol
+      
+      dynamic "backend_config" {
+        for_each = destination_nat.value.backend_configs
+        content {
+          port               = backend_config.value.port
+          public_ip_address  = backend_config.value.public_ip_address
+        }
+      }
+      
+      dynamic "frontend_config" {
+        for_each = destination_nat.value.frontend_configs
+        content {
+          port                  = frontend_config.value.port
+          public_ip_address_id  = frontend_config.value.public_ip_address_id
+        }
+      }
+    }
   }
 
   tags = local.common_tags
 
-  depends_on = [azurerm_palo_alto_local_rulestack.secondary]
+  depends_on = [azurerm_palo_alto_virtual_network_appliance.secondary]
 }
 
-# =============================================================================
-# Network Virtual Appliances
-# =============================================================================
 
-# Primary region NVA
-resource "azurerm_network_virtual_appliance" "primary" {
-  name                = "${local.resource_prefix}-nva-${local.regions.primary.short_name}"
-  resource_group_name = azurerm_resource_group.primary.name
-  location           = azurerm_resource_group.primary.location
-  virtual_hub_id     = data.azurerm_virtual_hub.primary_hub.id
-
-  sku {
-    vendor             = "Palo Alto Networks"
-    bundled_scale_unit = var.nva_scale_unit
-    scale_unit         = var.nva_scale_unit
-  }
-
-  tags = local.common_tags
-}
-
-# Secondary region NVA
-resource "azurerm_network_virtual_appliance" "secondary" {
-  name                = "${local.resource_prefix}-nva-${local.regions.secondary.short_name}"
-  resource_group_name = azurerm_resource_group.secondary.name
-  location           = azurerm_resource_group.secondary.location
-  virtual_hub_id     = data.azurerm_virtual_hub.secondary_hub.id
-
-  sku {
-    vendor             = "Palo Alto Networks"
-    bundled_scale_unit = var.nva_scale_unit
-    scale_unit         = var.nva_scale_unit
-  }
-
-  tags = local.common_tags
-}
 
 # =============================================================================
 # Virtual Hub Routing Intents
@@ -260,11 +272,11 @@ resource "azurerm_virtual_hub_routing_intent" "primary" {
     content {
       name         = routing_policy.value.name
       destinations = routing_policy.value.destinations
-      next_hop     = azurerm_network_virtual_appliance.primary.id
+      next_hop     = azurerm_palo_alto_virtual_network_appliance.primary.id
     }
   }
 
-  depends_on = [azurerm_network_virtual_appliance.primary]
+  depends_on = [azurerm_palo_alto_virtual_network_appliance.primary]
 }
 
 # Secondary region routing intent
@@ -277,11 +289,11 @@ resource "azurerm_virtual_hub_routing_intent" "secondary" {
     content {
       name         = routing_policy.value.name
       destinations = routing_policy.value.destinations
-      next_hop     = azurerm_network_virtual_appliance.secondary.id
+      next_hop     = azurerm_palo_alto_virtual_network_appliance.secondary.id
     }
   }
 
-  depends_on = [azurerm_network_virtual_appliance.secondary]
+  depends_on = [azurerm_palo_alto_virtual_network_appliance.secondary]
 }
 
 # =============================================================================

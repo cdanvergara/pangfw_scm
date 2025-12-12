@@ -1,6 +1,6 @@
-# Palo Alto Next Generation Firewall on Azure - Multi-Region
+# Palo Alto Next Generation Firewall on Azure - Multi-Region with Strata Cloud Manager
 
-This Terraform template deploys Palo Alto Next Generation Firewall (NGFW) across two customizable Azure regions with existing Virtual WAN infrastructure. The template is designed to be flexible, secure, and production-ready.
+This Terraform template deploys Palo Alto Next Generation Firewall (NGFW) across two customizable Azure regions with existing Virtual WAN infrastructure. The firewalls are managed centrally using **Strata Cloud Manager (SCM)**, Palo Alto Networks' cloud-native security management platform.
 
 ## 🏗️ Architecture Overview
 
@@ -10,9 +10,9 @@ This Terraform template deploys Palo Alto Next Generation Firewall (NGFW) across
    [Public IPs]
        |
 [Cloud NGFW Instances]
-       |
-  [Virtual Hubs]
-       |
+       |    |
+  [Virtual Hubs]   [Strata Cloud Manager]
+       |                  (Policy Management)
    [Virtual WAN]
        |
 [Connected Networks]
@@ -20,13 +20,14 @@ This Terraform template deploys Palo Alto Next Generation Firewall (NGFW) across
 
 ### Components Deployed
 
-- **Palo Alto Local Rulestacks** in both regions
-- **Cloud NGFW instances** with Panorama integration
-- **Network Virtual Appliances** for traffic routing
+- **Palo Alto Virtual Network Appliances** in both regions
+- **Cloud NGFW instances** with Strata Cloud Manager integration
 - **Public IP addresses** for external access
 - **Virtual Hub routing intents** for traffic direction
 - **Log Analytics workspace** for monitoring (optional)
 - **Network Security Groups** for management access (optional)
+
+**Key Advantage**: All firewall policies and configurations are managed centrally through Strata Cloud Manager, providing consistent security policies across regions without the need for local rulestacks or on-premises Panorama servers.
 
 ## 📋 Prerequisites
 
@@ -245,6 +246,9 @@ brew install azure-cli
    existing_vhub_primary_name = "hub-eastus"
    existing_vhub_secondary_name = "hub-centralus"
    
+   # REQUIRED: Your Strata Cloud Manager tenant name
+   strata_cloud_manager_tenant_name = "your-scm-tenant-name"
+   
    # SECURITY: Replace with your actual office/home IP ranges
    management_allowed_ips = [
      "203.0.113.0/24",    # Replace with your office IP range
@@ -422,23 +426,30 @@ brew install azure-cli
    
    Try accessing these URLs in your browser (may take 5-10 minutes after deployment for services to fully start).
 
-### Step 7: Initial NGFW Configuration
+### Step 7: Initial NGFW Configuration with Strata Cloud Manager
 
-1. **Access NGFW Web Interface**:
-   - Open the management URLs from the Terraform outputs
-   - Default credentials: `admin` / `admin` (change immediately)
-   - Accept SSL certificate warnings (expected for new deployment)
+1. **Access Strata Cloud Manager**:
+   - Navigate to [Strata Cloud Manager](https://apps.paloaltonetworks.com/)
+   - Log in with your Palo Alto Networks credentials
+   - Select your tenant (the one specified in `strata_cloud_manager_tenant_name`)
 
-2. **Basic Security Configuration**:
-   ```bash
-   # If using Panorama, the configuration will be pushed from there
-   # Otherwise, configure basic security policies through the web UI
-   ```
+2. **Verify Firewall Registration**:
+   - Go to **Manage** → **NGFWs** in Strata Cloud Manager
+   - Verify that both Azure NGFWs appear and are connected
+   - Status should show "Connected" for both firewalls
 
-3. **Verify Traffic Flow**:
-   - Check Virtual Hub routing tables
-   - Verify traffic is being routed through NGFWs
-   - Test connectivity through the firewalls
+3. **Configure Security Policies**:
+   - Navigate to **Manage** → **Configuration** → **Security Policy**
+   - Create security rules as needed for your environment
+   - Configure security profiles (Anti-virus, Anti-spyware, etc.)
+
+4. **Push Configuration**:
+   - After configuring policies, click **Push** to deploy to firewalls
+   - Monitor the push status to ensure successful deployment
+
+5. **Verify Policy Installation**:
+   - Check that policies are successfully installed on both NGFWs
+   - Monitor logs in **Monitor** → **Logs** section
 
 ### Step 8: Post-Deployment Tasks
 
@@ -548,27 +559,38 @@ secondary_region = "Japan West"
 | `existing_vwan_name` | Existing Virtual WAN name | - | ✅ |
 | `existing_vhub_primary_name` | Primary region hub name | - | ✅ |
 | `existing_vhub_secondary_name` | Secondary region hub name | - | ✅ |
-
-### Security Configuration
-
+| `strata_cloud_manager_tenant_name` | SCM tenant name | - | ✅ |
 ```hcl
-# Security profiles
-anti_spyware_profile = "BestPractice"
-anti_virus_profile = "BestPractice"
-vulnerability_profile = "BestPractice"
+# Strata Cloud Manager tenant (required)
+strata_cloud_manager_tenant_name = "your-scm-tenant"
+
+# Trusted networks
+trusted_address_ranges = [
+  "10.0.0.0/8",
+  "172.16.0.0/12", 
+  "192.168.0.0/16"
+]
 
 # Management access
 create_management_nsg = true
 management_allowed_ips = ["your-office-ip/24"]
 ```
 
+**Note**: Security policies, profiles, and rules are configured centrally in Strata Cloud Manager, not in Terraform.
+
 ### Performance Tuning
 
 ```hcl
-# Scale settings
-nva_scale_unit = 1           # 1-20
-throughput_capacity = 1      # Gbps
-session_capacity = 100       # Thousands
+# Network configuration
+trusted_address_ranges = [
+  "10.0.0.0/8",      # Private networks
+  "172.16.0.0/12",   # Private networks
+  "192.168.0.0/16"   # Private networks
+]
+
+# DNS settings
+enable_custom_dns = true
+custom_dns_servers = ["1.1.1.1", "1.0.0.1"]
 ```
 
 ### Monitoring Setup
@@ -662,22 +684,30 @@ echo "Total (excluding bandwidth): $$(echo '2 * 24 * 30 * 0.125 + 2 * 3.65 + 10 
 ```hcl
 # In terraform.tfvars for dev/test
 environment = "dev"
-nva_scale_unit = 1                    # Minimum scale
 enable_auto_shutdown = true           # Auto-shutdown after hours
 auto_shutdown_time = "19:00"          # Shutdown at 7 PM
 enable_monitoring = false             # Disable expensive monitoring
 log_retention_days = 7                # Shorter retention for dev
+
+# Use smaller trusted ranges for testing
+trusted_address_ranges = ["10.0.0.0/24"]
 ```
 
 #### 2. Production Environment Settings
 ```hcl
 # In terraform.tfvars for production
 environment = "prod"
-nva_scale_unit = 2                    # Higher scale for performance
 enable_auto_shutdown = false          # Always on
 enable_monitoring = true              # Full monitoring
 log_retention_days = 90               # Compliance retention
 enable_ddos_protection = true         # Enhanced security
+
+# Full trusted ranges for production
+trusted_address_ranges = [
+  "10.0.0.0/8",
+  "172.16.0.0/12",
+  "192.168.0.0/16"
+]
 ```
 
 #### 3. Cost Monitoring Setup
@@ -695,18 +725,18 @@ az consumption budget create \
 
 ### Performance Tuning Guidelines
 
-#### Scale Unit Configuration
+#### Virtual Network Appliance Configuration
 ```hcl
-# Performance vs Cost matrix
-# Scale Unit 1:  ~1 Gbps  - $90/month
-# Scale Unit 2:  ~2 Gbps  - $180/month  
-# Scale Unit 5:  ~5 Gbps  - $450/month
-# Scale Unit 10: ~10 Gbps - $900/month
+# Trusted network configuration
+trusted_address_ranges = [
+  "10.0.0.0/8",     # Private Class A
+  "172.16.0.0/12",  # Private Class B
+  "192.168.0.0/16"  # Private Class C
+]
 
-# Configure based on your needs
-nva_scale_unit = 1           # Start small and scale up
-throughput_capacity = 1      # Match scale unit
-session_capacity = 100       # Adjust for concurrent sessions
+# DNS configuration
+enable_custom_dns = true
+custom_dns_servers = ["1.1.1.1", "1.0.0.1"]  # Cloudflare DNS
 ```
 
 #### Regional Performance Considerations
@@ -779,9 +809,6 @@ primary_region = "East US"
 secondary_region = "Central US"
 
 # High availability settings
-nva_scale_unit = 3
-throughput_capacity = 3
-session_capacity = 500
 availability_zones = ["1", "2", "3"]
 
 # Enhanced security
@@ -793,6 +820,13 @@ management_allowed_ips = ["10.0.0.0/8", "172.16.0.0/12"]
 enable_monitoring = true
 log_analytics_sku = "PerGB2018" 
 log_retention_days = 365
+
+# Trusted networks for production
+trusted_address_ranges = [
+  "10.0.0.0/8",
+  "172.16.0.0/12",
+  "192.168.0.0/16"
+]
 ```
 
 ### Development/Testing Environment
@@ -805,13 +839,15 @@ primary_region = "Central US"      # Lower cost region
 secondary_region = "South Central US"
 
 # Minimal settings for testing
-nva_scale_unit = 1
 enable_auto_shutdown = true
 auto_shutdown_time = "18:00"
 
 # Reduced monitoring
 enable_monitoring = false
 log_retention_days = 7
+
+# Limited trusted ranges for testing
+trusted_address_ranges = ["10.0.0.0/24"]
 
 # Allow broader access for testing
 management_allowed_ips = ["0.0.0.0/0"]  # Only for dev!
@@ -1041,12 +1077,21 @@ terraform apply -var-file="terraform.tfvars"
 
 ### Scaling Operations
 
-#### Scale Up NGFWs
+#### Scale Configuration
 ```hcl
-# In terraform.tfvars, increase scale units
-nva_scale_unit = 2          # Was 1
-throughput_capacity = 2     # Match scale units
-session_capacity = 200      # Increase capacity
+# In terraform.tfvars, adjust trusted ranges and features
+
+# Expand trusted address ranges
+trusted_address_ranges = [
+  "10.0.0.0/8",      # Private Class A
+  "172.16.0.0/12",   # Private Class B
+  "192.168.0.0/16",  # Private Class C
+  "100.64.0.0/10"    # Carrier-grade NAT
+]
+
+# Enable additional features
+enable_custom_dns = true
+custom_dns_servers = ["1.1.1.1", "1.0.0.1"]
 ```
 
 ```bash
@@ -1142,9 +1187,13 @@ chmod +x backup-ngfw-config.sh
 #### Network Performance Tuning
 ```hcl
 # In terraform.tfvars for high-performance scenarios
-nva_scale_unit = 5              # Higher throughput
-throughput_capacity = 5         # Match scale units
-session_capacity = 1000         # High session count
+
+# Optimize trusted address ranges
+trusted_address_ranges = [
+  "10.0.0.0/8",      # Your private networks
+  "172.16.0.0/12",   # Additional private ranges
+  "192.168.0.0/16"   # Local networks
+]
 
 # Use performance-optimized regions
 primary_region = "East US"      # Microsoft's largest datacenter
@@ -1152,6 +1201,10 @@ secondary_region = "West US 2"  # High-performance region
 
 # Enable all availability zones
 availability_zones = ["1", "2", "3"]
+
+# Optimize DNS for performance
+enable_custom_dns = true
+custom_dns_servers = ["1.1.1.1", "1.0.0.1"]  # Fast DNS
 ```
 
 ### Compliance and Auditing

@@ -76,45 +76,56 @@ existing_vhub_primary_name = "my-hub-eastus"
 existing_vhub_secondary_name = "my-hub-centralus"
 
 # =============================================================================
-# Panorama Configuration (Optional)
+# Strata Cloud Manager Configuration (REQUIRED)
 # =============================================================================
 
-# Panorama hostname for centralized management
-panorama_hostname = ""
+# Strata Cloud Manager tenant name that will manage firewall policies
+# This must be your actual SCM tenant name from apps.paloaltonetworks.com
+strata_cloud_manager_tenant_name = "your-scm-tenant-name"
 
-# Primary Panorama server IP
-panorama_server = ""
-
-# Secondary Panorama server IP (for HA)
-panorama_server_2 = ""
-
-# Panorama configuration string
-panorama_config_string = ""
-
-# Panorama template name
-panorama_template_name = ""
-
-# SSH public key for VM access
-panorama_vm_ssh_key = ""
+# Optional: Marketplace configuration (defaults are usually fine)
+# marketplace_offer_id = "pan_swfw_cloud_ngfw"
+# plan_id = "panw-cngfw-payg"
 
 # =============================================================================
-# Security Profiles (Customizable)
+# Network Configuration (Optional)
 # =============================================================================
 
-# Security profile configurations
-anti_spyware_profile = "BestPractice"
-anti_virus_profile = "BestPractice" 
-dns_subscription = "BestPractice"
-file_blocking_profile = "BestPractice"
-url_filtering_profile = "BestPractice"
-vulnerability_profile = "BestPractice"
+# Trusted address ranges for the network (optional)
+trusted_address_ranges = [
+  "10.0.0.0/8",     # Private networks
+  "172.16.0.0/12",  # Private networks  
+  "192.168.0.0/16"  # Private networks
+]
+
+# Enable custom DNS configuration
+enable_custom_dns = false
 
 # =============================================================================
-# Network Virtual Appliance Configuration
+# Destination NAT Configuration (Optional)
 # =============================================================================
 
-# Scale unit for NVA (1-20)
-nva_scale_unit = 1
+# Configure destination NAT rules if needed
+# destination_nat_rules = [
+#   {
+#     name     = "web-server-nat"
+#     protocol = "TCP"
+#     backend_configs = [
+#       {
+#         port               = 80
+#         public_ip_address  = "10.0.1.100"
+#       }
+#     ]
+#     frontend_configs = [
+#       {
+#         port                  = 80
+#         public_ip_address_id  = azurerm_public_ip.primary_ngfw.id
+#       }
+#     ]
+#   }
+# ]
+
+
 
 # =============================================================================
 # Routing Configuration

@@ -56,71 +56,54 @@ output "secondary_ngfw_public_ip_id" {
 
 output "primary_ngfw_id" {
   description = "ID of the primary region Next Generation Firewall"
-  value       = azurerm_palo_alto_next_generation_firewall_virtual_hub_panorama.primary.id
+  value       = azurerm_palo_alto_next_generation_firewall_virtual_hub_strata_cloud_manager.primary.id
 }
 
 output "primary_ngfw_name" {
   description = "Name of the primary region Next Generation Firewall"
-  value       = azurerm_palo_alto_next_generation_firewall_virtual_hub_panorama.primary.name
+  value       = azurerm_palo_alto_next_generation_firewall_virtual_hub_strata_cloud_manager.primary.name
 }
 
 output "secondary_ngfw_id" {
   description = "ID of the secondary region Next Generation Firewall"
-  value       = azurerm_palo_alto_next_generation_firewall_virtual_hub_panorama.secondary.id
+  value       = azurerm_palo_alto_next_generation_firewall_virtual_hub_strata_cloud_manager.secondary.id
 }
 
 output "secondary_ngfw_name" {
   description = "Name of the secondary region Next Generation Firewall"
-  value       = azurerm_palo_alto_next_generation_firewall_virtual_hub_panorama.secondary.name
+  value       = azurerm_palo_alto_next_generation_firewall_virtual_hub_strata_cloud_manager.secondary.name
+}
+
+output "strata_cloud_manager_tenant" {
+  description = "Strata Cloud Manager tenant name managing these firewalls"
+  value       = var.strata_cloud_manager_tenant_name
 }
 
 # =============================================================================
-# Rulestack Outputs
+# Virtual Network Appliance Outputs
 # =============================================================================
 
-output "primary_rulestack_id" {
-  description = "ID of the primary region local rulestack"
-  value       = azurerm_palo_alto_local_rulestack.primary.id
+output "primary_appliance_id" {
+  description = "ID of the primary region Palo Alto Virtual Network Appliance"
+  value       = azurerm_palo_alto_virtual_network_appliance.primary.id
 }
 
-output "primary_rulestack_name" {
-  description = "Name of the primary region local rulestack"
-  value       = azurerm_palo_alto_local_rulestack.primary.name
+output "primary_appliance_name" {
+  description = "Name of the primary region Palo Alto Virtual Network Appliance"
+  value       = azurerm_palo_alto_virtual_network_appliance.primary.name
 }
 
-output "secondary_rulestack_id" {
-  description = "ID of the secondary region local rulestack"
-  value       = azurerm_palo_alto_local_rulestack.secondary.id
+output "secondary_appliance_id" {
+  description = "ID of the secondary region Palo Alto Virtual Network Appliance"
+  value       = azurerm_palo_alto_virtual_network_appliance.secondary.id
 }
 
-output "secondary_rulestack_name" {
-  description = "Name of the secondary region local rulestack"
-  value       = azurerm_palo_alto_local_rulestack.secondary.name
+output "secondary_appliance_name" {
+  description = "Name of the secondary region Palo Alto Virtual Network Appliance"
+  value       = azurerm_palo_alto_virtual_network_appliance.secondary.name
 }
 
-# =============================================================================
-# Network Virtual Appliance Outputs
-# =============================================================================
 
-output "primary_nva_id" {
-  description = "ID of the primary region Network Virtual Appliance"
-  value       = azurerm_network_virtual_appliance.primary.id
-}
-
-output "primary_nva_name" {
-  description = "Name of the primary region Network Virtual Appliance"
-  value       = azurerm_network_virtual_appliance.primary.name
-}
-
-output "secondary_nva_id" {
-  description = "ID of the secondary region Network Virtual Appliance"
-  value       = azurerm_network_virtual_appliance.secondary.id
-}
-
-output "secondary_nva_name" {
-  description = "Name of the secondary region Network Virtual Appliance"
-  value       = azurerm_network_virtual_appliance.secondary.name
-}
 
 # =============================================================================
 # Routing Intent Outputs
@@ -235,9 +218,10 @@ output "azure_portal_links" {
   value = {
     primary_resource_group   = "https://portal.azure.com/#@/resource${azurerm_resource_group.primary.id}"
     secondary_resource_group = "https://portal.azure.com/#@/resource${azurerm_resource_group.secondary.id}"
-    primary_ngfw            = "https://portal.azure.com/#@/resource${azurerm_palo_alto_next_generation_firewall_virtual_hub_panorama.primary.id}"
-    secondary_ngfw          = "https://portal.azure.com/#@/resource${azurerm_palo_alto_next_generation_firewall_virtual_hub_panorama.secondary.id}"
+    primary_ngfw            = "https://portal.azure.com/#@/resource${azurerm_palo_alto_next_generation_firewall_virtual_hub_strata_cloud_manager.primary.id}"
+    secondary_ngfw          = "https://portal.azure.com/#@/resource${azurerm_palo_alto_next_generation_firewall_virtual_hub_strata_cloud_manager.secondary.id}"
     virtual_wan             = "https://portal.azure.com/#@/resource${data.azurerm_virtual_wan.existing_vwan.id}"
+    strata_cloud_manager    = "https://apps.paloaltonetworks.com/"
   }
 }
 
@@ -248,13 +232,15 @@ output "azure_portal_links" {
 output "deployment_summary" {
   description = "Summary of the deployed infrastructure"
   value = {
-    project_name    = var.project_name
-    environment     = var.environment
-    primary_region  = local.regions.primary.name
-    secondary_region = local.regions.secondary.name
-    ngfw_count      = 2
-    nva_count       = 2
-    public_ips      = 2
-    monitoring_enabled = var.enable_monitoring
+    project_name               = var.project_name
+    environment                = var.environment
+    primary_region             = local.regions.primary.name
+    secondary_region           = local.regions.secondary.name
+    ngfw_count                 = 2
+    virtual_appliance_count    = 2
+    public_ips                 = 2
+    monitoring_enabled         = var.enable_monitoring
+    management_type            = "Strata Cloud Manager"
+    strata_tenant              = var.strata_cloud_manager_tenant_name
   }
 }

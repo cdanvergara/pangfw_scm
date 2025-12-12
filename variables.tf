@@ -94,98 +94,76 @@ variable "existing_vhub_secondary_name" {
 }
 
 # =============================================================================
-# Panorama Configuration Variables
+# Strata Cloud Manager Configuration Variables
 # =============================================================================
 
-variable "panorama_hostname" {
-  description = "Panorama hostname for NGFW management"
+variable "strata_cloud_manager_tenant_name" {
+  description = "Strata Cloud Manager tenant name that will manage the policy for these firewalls"
   type        = string
-  default     = ""
-}
-
-variable "panorama_server" {
-  description = "Primary Panorama server IP address"
-  type        = string
-  default     = ""
-}
-
-variable "panorama_server_2" {
-  description = "Secondary Panorama server IP address (optional)"
-  type        = string
-  default     = ""
-}
-
-variable "panorama_config_string" {
-  description = "Panorama configuration string"
-  type        = string
-  default     = ""
-}
-
-variable "panorama_template_name" {
-  description = "Panorama template name"
-  type        = string
-  default     = ""
-}
-
-variable "panorama_vm_ssh_key" {
-  description = "SSH public key for Panorama VM access"
-  type        = string
-  default     = ""
-}
-
-# =============================================================================
-# Security Profile Variables
-# =============================================================================
-
-variable "anti_spyware_profile" {
-  description = "Anti-spyware profile name"
-  type        = string
-  default     = "BestPractice"
-}
-
-variable "anti_virus_profile" {
-  description = "Anti-virus profile name"
-  type        = string
-  default     = "BestPractice"
-}
-
-variable "dns_subscription" {
-  description = "DNS subscription type"
-  type        = string
-  default     = "BestPractice"
-}
-
-variable "file_blocking_profile" {
-  description = "File blocking profile name"
-  type        = string
-  default     = "BestPractice"
-}
-
-variable "url_filtering_profile" {
-  description = "URL filtering profile name"
-  type        = string
-  default     = "BestPractice"
-}
-
-variable "vulnerability_profile" {
-  description = "Vulnerability protection profile name"
-  type        = string
-  default     = "BestPractice"
-}
-
-# =============================================================================
-# Network Virtual Appliance Variables
-# =============================================================================
-
-variable "nva_scale_unit" {
-  description = "Scale unit for Network Virtual Appliance"
-  type        = number
-  default     = 1
   validation {
-    condition     = var.nva_scale_unit >= 1 && var.nva_scale_unit <= 20
-    error_message = "NVA scale unit must be between 1 and 20."
+    condition     = length(var.strata_cloud_manager_tenant_name) > 0
+    error_message = "Strata Cloud Manager tenant name cannot be empty."
   }
 }
+
+variable "marketplace_offer_id" {
+  description = "The ID of the marketplace offer for the Palo Alto NGFW"
+  type        = string
+  default     = "pan_swfw_cloud_ngfw"
+}
+
+variable "plan_id" {
+  description = "The ID of the billing plan for the Palo Alto NGFW"
+  type        = string
+  default     = "panw-cngfw-payg"
+}
+
+variable "trusted_address_ranges" {
+  description = "List of trusted address ranges for the network"
+  type        = list(string)
+  default     = []
+  validation {
+    condition = alltrue([
+      for range in var.trusted_address_ranges : can(cidrhost(range, 0))
+    ])
+    error_message = "All trusted address ranges must be valid CIDR blocks."
+  }
+}
+
+variable "enable_custom_dns" {
+  description = "Enable custom DNS configuration"
+  type        = bool
+  default     = false
+}
+
+# =============================================================================
+# Destination NAT Configuration Variables  
+# =============================================================================
+
+variable "destination_nat_rules" {
+  description = "List of destination NAT rules for the NGFWs"
+  type = list(object({
+    name     = string
+    protocol = string
+    backend_configs = list(object({
+      port               = number
+      public_ip_address  = string
+    }))
+    frontend_configs = list(object({
+      port                  = number
+      public_ip_address_id  = string
+    }))
+  }))
+  default = []
+  validation {
+    condition = alltrue([
+      for rule in var.destination_nat_rules : contains(["TCP", "UDP"], rule.protocol)
+    ])
+    error_message = "Protocol must be either TCP or UDP."
+  }
+}
+
+
 
 # =============================================================================
 # Routing Configuration Variables
